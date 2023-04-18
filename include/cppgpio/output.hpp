@@ -30,186 +30,202 @@
 #include <chrono>
 #include <cppgpio/gpio.hpp>
 
-namespace GPIO {
+namespace GPIO
+{
 
-    /// The class DigitalOut is controlling one single output pin, which
-    /// can be switched on or off, or switched on or off for a specified
-    /// period of time.
+   /// The class DigitalOut is controlling one single output pin, which
+   /// can be switched on or off, or switched on or off for a specified
+   /// period of time.
 
-    class DigitalOut : public ObjectBase {
-    public:
+   class DigitalOut : public ObjectBase
+   {
+   public:
+      /// Constructor for the DigitalOut object. Switches IO pin to output.
+      /// Requires the GPIO pin as argument.
 
-        /// Constructor for the DigitalOut object. Switches IO pin to output.
-        /// Requires the GPIO pin as argument.
+      DigitalOut(unsigned int pin);
 
-        DigitalOut(unsigned int pin);
+      /// Destructor switches IO pin back to input mode.
 
-        /// Destructor switches IO pin back to input mode.
+      virtual ~DigitalOut();
 
-        virtual ~DigitalOut();
+      /// Switch output on
 
-        /// Switch output on
+      void on() const { m_gpio.set(m_pin); }
 
-        void  on() const { m_gpio.set(m_pin);   }
+      /// Switch output off
 
-        /// Switch output off
+      void off() const { m_gpio.clear(m_pin); }
 
-        void off() const { m_gpio.clear(m_pin); }
+      /// Switch output on for a given intervall, then switch it off again
 
-        /// Switch output on for a given intervall, then switch it off again
+      void on(std::chrono::nanoseconds nanos) const;
 
-        void  on(std::chrono::nanoseconds nanos) const;
+      /// Switch output off for a given intervall, then switch it on again
 
-        /// Switch output off for a given intervall, then switch it on again
-        
-        void off(std::chrono::nanoseconds nanos) const;
-        
-    private:
-        unsigned int m_pin;
-        GPIOBase m_gpio;
-    };
+      void off(std::chrono::nanoseconds nanos) const;
 
+   private:
+      unsigned int m_pin;
+      GPIOBase m_gpio;
+   };
 
-    /// The class ShiftOut permits to serially transmit any scalar type on
-    /// an output port. It also needs a clock and latch port to signal the
-    /// validity of each sent bit as well as the end of transmission. This
-    /// permits to extend the output ports by simple 74xxx shift registers.
+   /// The class ShiftOut permits to serially transmit any scalar type on
+   /// an output port. It also needs a clock and latch port to signal the
+   /// validity of each sent bit as well as the end of transmission. This
+   /// permits to extend the output ports by simple 74xxx shift registers.
 
-    class ShiftOut : public ObjectBase {
-    public:
-        enum class DIRECTION : uint8_t { LSBFIRST, MSBFIRST };
+   class ShiftOut : public ObjectBase
+   {
+   public:
+      enum class DIRECTION : uint8_t
+      {
+         LSBFIRST,
+         MSBFIRST
+      };
 
-        /// Constructor for ShiftOut. Needs three IO ports which
-        /// will be switched into output mode. Direction parameter
-        /// indicates if the values shall be transmitted with LSB
-        /// or MSB first.
+      /// Constructor for ShiftOut. Needs three IO ports which
+      /// will be switched into output mode. Direction parameter
+      /// indicates if the values shall be transmitted with LSB
+      /// or MSB first.
 
-        ShiftOut(unsigned int pin_data,
-                 unsigned int pin_clock,
-                 unsigned int pin_latch,
-                 DIRECTION direction = DIRECTION::LSBFIRST);
+      ShiftOut(unsigned int pin_data,
+               unsigned int pin_clock,
+               unsigned int pin_latch,
+               DIRECTION direction = DIRECTION::LSBFIRST);
 
-        /// The destructor switches the mode of the ports back to
-        /// input mode.
+      /// The destructor switches the mode of the ports back to
+      /// input mode.
 
-        virtual ~ShiftOut();
+      virtual ~ShiftOut();
 
-        /// Write a value of any scalar type to the selected port.
-        /// Throws if the value is not a scalar type.
-        /// The bits parameter determines how many bits of value
-        /// are written. When bits is larger than the count of bits
-        /// of value's type definition, a GPIOError is thrown.
+      /// Write a value of any scalar type to the selected port.
+      /// Throws if the value is not a scalar type.
+      /// The bits parameter determines how many bits of value
+      /// are written. When bits is larger than the count of bits
+      /// of value's type definition, a GPIOError is thrown.
 
-        template <class VALUE>
-        void write(const VALUE& value, uint8_t bits) const
-        {
-            static_assert(std::is_scalar<VALUE>::value, "need scalar type");
-            static_assert(bits > sizeof(value)*8, "bits exceed value type's size");
-            
-            latch(false);
-            VALUE mask;
-            if (m_direction == DIRECTION::LSBFIRST) mask = 1;
-            else mask = 1 << (bits - 1);
-            for (uint8_t b = 0; b < bits; ++b){
-                write1(value & mask);
-                if (m_direction == DIRECTION::LSBFIRST) mask <<= 1;
-                else mask >>= 1;
-            }
-            latch(true);
-        }
+      template <class VALUE>
+      void write(const VALUE &value, uint8_t bits) const
+      {
+         static_assert(std::is_scalar<VALUE>::value, "need scalar type");
+         static_assert(bits > sizeof(value) * 8, "bits exceed value type's size");
 
-        /// Write a value of any scalar type to the selected port.
-        /// Throws if the value is not a scalar type.
-        /// Determines bit size by looking at the type definition
-        /// of the value.
+         latch(false);
+         VALUE mask;
+         if (m_direction == DIRECTION::LSBFIRST)
+            mask = 1;
+         else
+            mask = 1 << (bits - 1);
+         for (uint8_t b = 0; b < bits; ++b)
+         {
+            write1(value & mask);
+            if (m_direction == DIRECTION::LSBFIRST)
+               mask <<= 1;
+            else
+               mask >>= 1;
+         }
+         latch(true);
+      }
 
-        template <class VALUE>
-        void write(const VALUE& value) const
-        {
-            write(value, sizeof(VALUE)*8);
-        }
+      /// Write a value of any scalar type to the selected port.
+      /// Throws if the value is not a scalar type.
+      /// Determines bit size by looking at the type definition
+      /// of the value.
 
-    protected:
-        void latch(bool trigger) const { m_gpio.write(m_pin_latch, trigger); }
-        void write1(bool value) const;
+      template <class VALUE>
+      void write(const VALUE &value) const
+      {
+         write(value, sizeof(VALUE) * 8);
+      }
 
-    private:
-        unsigned int m_pin_data;
-        unsigned int m_pin_clock;
-        unsigned int m_pin_latch;
-        DIRECTION m_direction;
-        GPIOBase m_gpio;
-    };
+   protected:
+      void latch(bool trigger) const { m_gpio.write(m_pin_latch, trigger); }
+      void write1(bool value) const;
 
-    /// The class PWMOut controls a PWM output port. If the selected port does not
-    /// support hardware PWM output, the software PWM emulation is used (which is
-    /// less accurate due to kernel scheduling).
+   private:
+      unsigned int m_pin_data;
+      unsigned int m_pin_clock;
+      unsigned int m_pin_latch;
+      DIRECTION m_direction;
+      GPIOBase m_gpio;
+   };
 
-    class PWMOut : public ObjectBase {
-    public:
+   /// The class PWMOut controls a PWM output port. If the selected port does not
+   /// support hardware PWM output, the software PWM emulation is used (which is
+   /// less accurate due to kernel scheduling).
 
-        /// Constructor for PWMOut. Requires an output port and optionally a range
-        /// and a ratio value for the initial PWM output configuration. Per default
-        /// range will be set to 1024 and ratio to 0.
+   class PWMOut : public ObjectBase
+   {
+   public:
+      /// Constructor for PWMOut. Requires an output port and optionally a range
+      /// and a ratio value for the initial PWM output configuration. Per default
+      /// range will be set to 1024 and ratio to 0.
 
-        PWMOut(unsigned int pin, unsigned int range = 1024, unsigned int ratio = 0);
+      PWMOut(unsigned int pin, unsigned int range = 1024, unsigned int ratio = 0);
 
-        /// Destructor for PWMOut. Switches the used port back into input mode.
+      /// Destructor for PWMOut. Switches the used port back into input mode.
 
-        virtual ~PWMOut();
+      virtual ~PWMOut();
 
-        /// Set the range to a new value. If range > ratio the behaviour is undefined.
+      /// Set the range to a new value. If range > ratio the behaviour is undefined.
 
-        void set_range(unsigned int range) const;
+      void set_range(unsigned int range) const;
 
-        /// Set the ratio to a new value. If range > ratio the behaviour is undefined.
-        
-        void set_ratio(unsigned int ratio) const;
+      /// Set the ratio to a new value. If range > ratio the behaviour is undefined.
 
-        /// Returns true if this is not a hardware PWM channel but a software emulation.
+      void set_ratio(unsigned int ratio) const;
 
-        bool is_software_emulation() const { return m_is_soft_pwm; }
-        
-    private:
-        unsigned int m_pin;
-        bool m_is_soft_pwm;
-        GPIOBase m_gpio;
-    };
+      /// Returns true if this is not a hardware PWM channel but a software emulation.
 
-    /// The class ToneOut permits to output square waves of a given frequency at any
-    /// output port. If available, a hard PWM channel will be used, but a software
-    /// emulation with limited frequency range (0..10000 Hz) is available on any port.
+      bool is_software_emulation() const { return m_is_soft_pwm; }
 
-    class ToneOut : public ObjectBase {
-    public:
+   private:
+      unsigned int m_pin;
+      bool m_is_soft_pwm;
+      GPIOBase m_gpio;
+   };
 
-        /// Constructor for ToneOut. Requires an output port and optionally a frequency.
-        /// Per default, frequency will be set to 0 Hz.
+   /// The class ToneOut permits to output square waves of a given frequency at any
+   /// output port. If available, a hard PWM channel will be used, but a software
+   /// emulation with limited frequency range (0..10000 Hz) is available on any port.
 
-        ToneOut(unsigned int pin, unsigned int hz = 0);
+   class ToneOut : public ObjectBase
+   {
+   public:
+      /// Constructor for ToneOut. Requires an output port and optionally a frequency.
+      /// Per default, frequency will be set to 0 Hz.
 
-        /// Destructor for ToneOut. Switches the used port back into input mode.
-        
-        virtual ~ToneOut();
+      ToneOut(unsigned int pin, unsigned int hz = 0);
 
-        /// Set the frequency to a new value. If this is a software emulation the function
-        /// throws if the frequency is > 10000 Hz.
+      /// Destructor for ToneOut. Switches the used port back into input mode.
 
-        void set_freq(unsigned int hz) const;
+      virtual ~ToneOut();
 
-        /// Returns true if this is not a hardware PWM channel but a software emulation.
+      /// Set the frequency to a new value. If this is a software emulation the function
+      /// throws if the frequency is > 10000 Hz.
 
-        bool is_software_emulation() const { return m_is_soft_tone; }
+      void set_freq(unsigned int hz) const;
 
-    private:
-        unsigned int m_pin;
-        bool m_is_soft_tone;
-        GPIOBase m_gpio;
-    };
+      /// Returns true if this is not a hardware PWM channel but a software emulation.
 
-    /// BlinkOut is simply a ToneOut (but typically run with frequencies in the range of 1-20 Hz)
-    
-    typedef ToneOut BlinkOut;
+      bool is_software_emulation() const { return m_is_soft_tone; }
+
+      /// Sets 0V to this pin. Interestingly this doesn't turn it off.
+      void turnOff() const;
+
+      /// Sets 3.3V to the pin.
+      void turnOn() const;
+
+   private:
+      unsigned int m_pin;
+      bool m_is_soft_tone;
+      GPIOBase m_gpio;
+   };
+
+   /// BlinkOut is simply a ToneOut (but typically run with frequencies in the range of 1-20 Hz)
+
+   typedef ToneOut BlinkOut;
 
 }
 
